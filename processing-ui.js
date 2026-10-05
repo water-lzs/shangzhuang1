@@ -1,0 +1,42 @@
+import {RECIPES,ROUTES,NOTE_COUNT,targetTime,duration,completion,processEstimate} from './processing-engine.js';
+const SEASON={spring:'春 · 谷雨 · 水田映晨光',summer:'夏 · 小暑 · 绿稻满田',autumn:'秋 · 秋分 · 金色稻田',winter:'冬 · 冬至 · 雪覆休耕田'};
+export function createProcessing({getState,dispatch,goFarm}){
+ const root=document.querySelector('#processing-root');let selected='riceball',raf=0,started=0,offset=0,lastSave=0,feedback='等待节拍';
+ const elapsed=()=>Math.max(0,offset+performance.now()-started);
+ function stop(){cancelAnimationFrame(raf);raf=0;}
+ function pause(){if(getState().workshop.active?.phase==='running'){const t=elapsed();stop();dispatch({type:'process:pause',elapsed:t},{quiet:true});}render();}
+ function tap(){const w=getState().workshop;if(w.active?.phase!=='running')return;const before=w.active.hits.filter(x=>x>0).length;dispatch({type:'process:tap',elapsed:elapsed()},{quiet:true});const after=getState().workshop.active;feedback=after.hits.filter(x=>x>0).length>before?'命中！米香渐起':'未合拍，再看金色判定线';updateHUD();}
+ function updateHUD(){const w=getState().workshop,a=w.active;if(!a)return;const t=a.phase==='running'?Math.min(duration(w),elapsed()):a.elapsed;
+  root.dataset.rhythm=JSON.stringify({elapsed:Math.round(t),phase:a.phase,completion:Math.round(completion(a)*100),hits:a.hits});
+  const progress=root.querySelector('.rhythm-progress span');if(progress)progress.style.width=(t/duration(w)*100)+'%';
+  const score=root.querySelector('#rhythm-score');if(score)score.textContent=Math.round(completion(a)*100)+'%';
+  const feed=root.querySelector('#rhythm-feedback');if(feed)feed.textContent=feedback;
+  root.querySelectorAll('.rhythm-note').forEach((n,i)=>{const delta=targetTime(w,i)-t;n.style.left=(50+delta/2000*100)+'%';n.classList.toggle('done',a.hits[i]!==null);n.classList.toggle('perfect',a.hits[i]===1);n.hidden=delta>1050||delta < -1050;});
+ }
+ function loop(){const w=getState().workshop;if(w.active?.phase!=='running'){stop();return;}const t=elapsed();if(t-lastSave>=180){dispatch({type:'process:tick',elapsed:t},{quiet:true});lastSave=t;}
+  updateHUD();if(t>=duration(w)){stop();dispatch({type:'process:tick',elapsed:duration(w)},{quiet:true});dispatch({type:'process:finish'});return;}raf=requestAnimationFrame(loop);
+ }
+ function startRhythm(){dispatch({type:'process:resume'},{quiet:true});const a=getState().workshop.active;if(!a||a.phase!=='running')return;offset=a.elapsed;started=performance.now();lastSave=offset;feedback='亮点到金线时点击';render();root.querySelector('#rhythm-hit')?.focus({preventScroll:true});root.querySelector('.rhythm-game')?.scrollIntoView({behavior:'smooth',block:'center'});raf=requestAnimationFrame(loop);}
+ function render(message=''){
+  const s=getState(),w=s.workshop,a=w.active;if(a)selected=a.recipe;
+  const r=RECIPES[selected],route=w.route?ROUTES[w.route]:null,learned=w.learned.includes(selected);
+  root.innerHTML=`<div class="farm-heading"><span>二产加工 · 天工开物</span><h1>御米作坊</h1><p>第 ${s.year} 年 · ${SEASON[s.season]}</p></div><section class="workshop-stats"><div><span>可用稻米</span><strong>${s.rice.toLocaleString()} <small>kg</small></strong></div><div><span>技艺点</span><strong>${w.points}</strong></div><div><span>已学技能</span><strong>${w.learned.length} <small>/ 7</small></strong></div><div><span>已完成</span><strong>${w.completed} <small>批</small></strong></div></section>
+  <section class="farm-card route-card"><div class="farm-card-head"><h2>选择科技分支</h2><span>${w.serial?'本局路线已确定':'首批加工前可改选'}</span></div><div class="route-options">${Object.entries(ROUTES).map(([k,v])=>`<button data-process="route" data-route="${k}" ${w.serial?'disabled':''} class="${w.route===k?'selected':''}" aria-pressed="${w.route===k}"><b>${v.name}</b><span>${v.description}</span>${w.route===k?'<em>已选择</em>':''}</button>`).join('')}</div></section>
+  <div class="processing-columns"><section class="farm-card skill-card"><div class="farm-card-head"><h2>加工技能树</h2><span>完成度 ≥50% 的每批加工获得 1 技艺点</span></div><p class="skill-path">饭团 → 蛋炒饭 / 米糕 → 酿酒<br>米粉 → 肠粉 / 米线</p><div class="recipe-grid">${Object.entries(RECIPES).map(([k,v])=>`<button data-process="select" data-recipe="${k}" ${a?'disabled':''} class="${selected===k?'selected':''}" aria-pressed="${selected===k}"><i>${v.glyph}</i><b>${v.name}</b><span>${v.rice} kg / 批</span><small>${w.learned.includes(k)?'已学会':v.requires.length?'前置：'+v.requires.map(p=>RECIPES[p].name).join('、'):'入门技能'}</small></button>`).join('')}</div><div class="food-inventory"><h3>食物仓库</h3>${Object.entries(RECIPES).map(([k,v])=>`<span>${v.product||v.name}<b>${w.foods[k]} ${v.unit}</b></span>`).join('')}</div></section>
+  <section class="farm-card craft-card"><div class="farm-card-head"><h2>${a?'正在制作 · ':''}${r.product||r.name}</h2><span>${r.rice} kg 稻米 / 批</span></div>${a?rhythmHTML(w):`<div class="recipe-output"><span>基础产出</span><strong>${r.base} <small>${r.unit}</small></strong><p>${route?`本路线可产 ${processEstimate(w,selected,0)}–${processEstimate(w,selected,1)} ${r.unit}，取决于节奏完成度。`:'选择路线后显示预计产量。'}</p></div><p class="recipe-tip">${r.step}时跟随 12 个节拍，点击按钮或按空格。每次加工固定消耗 ${r.rice} kg 稻米；辅料在本版配方中视为已备齐。</p>${!learned?`<button class="farm-primary" data-process="learn" ${w.points<r.cost||r.requires.some(k=>!w.learned.includes(k))?'disabled':''}>学习${r.name} · ${r.cost} 技艺点</button>`:`<button class="farm-primary" data-process="start" ${!route||s.rice<r.rice?'disabled':''}>投入 ${r.rice} kg 稻米，准备加工</button>`}<p class="recipe-tip">${!learned&&r.requires.some(k=>!w.learned.includes(k))?'需要先学会：'+r.requires.map(k=>RECIPES[k].name).join('、'):s.rice<r.rice?'稻米不足，请返回御田完成秋收。':'按开始时扣米；暂停或刷新继续原批次，不再扣米。'}</p><button class="text-button" data-process="farm">返回御田</button>`}
+  ${!a&&w.last?`<section class="processing-result" role="status"><span>第 ${w.last.id} 批 · 已自动入库</span><h3>${RECIPES[w.last.recipe].product||RECIPES[w.last.recipe].name} +${w.last.quantity}${w.last.unit}</h3><p>完成度 ${w.last.completion}% · 精准 ${w.last.perfect} / 合拍 ${w.last.good} / 漏拍 ${w.last.miss}</p><p>消耗 ${w.last.rice} kg · 技艺点 +${w.last.point}</p></section>`:''}
+  <p class="farm-message" role="status">${message.replace(/[<>]/g,'')}</p><details class="farm-rules"><summary>加工与节奏规则</summary><p>每批 12 拍：精准 1 分、合拍 0.65 分、漏拍 0 分；空击每次扣完成度 2.5 个百分点，连续 110ms 内的点击忽略。完成度 = 命中分÷12 − 空击扣分（最低 0）。</p><p>产量 = 向下取整〔基础产出 × (0.5 + 完成度) × 路线系数〕。现代工业系数 1.2；生态古法系数 1.0、节拍和判定更宽松。最低也有半份基础产出，不退还投入稻米。</p><p>配方仅模拟稻米消耗，蛋、油、曲等辅料已备齐；不是现实烹饪或酿造说明。加工不推进季节；背景与存档当前季节一致。</p></details></section></div>`;
+  root.querySelectorAll('[data-process]').forEach(b=>b.addEventListener('click',()=>{const action=b.dataset.process;
+   if(action==='select'){selected=b.dataset.recipe;render();return;}
+   if(action==='farm'){pause();goFarm();return;}
+   if(action==='route')dispatch({type:'process:route',route:b.dataset.route});
+   if(action==='learn')dispatch({type:'process:learn',recipe:selected});
+   if(action==='start')dispatch({type:'process:start',recipe:selected});
+   if(action==='resume')startRhythm();if(action==='pause')pause();if(action==='hit')tap();
+  }));updateHUD();
+ }
+ function rhythmHTML(w){const a=w.active;return `<section class="rhythm-game" aria-label="加工节奏小游戏"><div class="rhythm-caption"><span>完成度 <b id="rhythm-score">${Math.round(completion(a)*100)}%</b></span><span>12 拍 · ${ROUTES[w.route].name}</span></div><div class="rhythm-lane"><div class="rhythm-target"></div>${a.hits.map((_,i)=>`<i class="rhythm-note" data-note="${i}">${i+1}</i>`).join('')}</div><div class="rhythm-progress"><span></span></div><p id="rhythm-feedback" aria-live="off">${feedback}</p>${a.phase==='running'?'<button class="farm-primary rhythm-hit" id="rhythm-hit" data-process="hit">合拍制作 · 点击 / 空格</button><button class="text-button" data-process="pause">暂停加工</button>':`<p class="recipe-tip">本批已扣 ${RECIPES[a.recipe].rice} kg。亮点移动到金色中央线时点击；不要连点。</p><button class="farm-primary" data-process="resume">${a.phase==='ready'?'开始节奏':'继续本批节奏'}</button>`}</section>`;}
+ const keydown=e=>{if(e.code==='Space'&&!e.repeat&&!/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)&&!root.hidden&&getState().workshop.active?.phase==='running'){e.preventDefault();tap();}};
+ addEventListener('keydown',keydown);document.addEventListener('visibilitychange',()=>{if(document.hidden&&getState().workshop.active?.phase==='running')pause();});addEventListener('pagehide',()=>{if(getState().workshop.active?.phase==='running'){stop();dispatch({type:'process:pause',elapsed:elapsed()},{quiet:true});}});
+ return {render,pause,stop};
+}
