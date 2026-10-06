@@ -18,7 +18,7 @@ for(const [s,c]of Object.entries(SEASONS)){c.file='JingXi_Aligned_'+s[0].toUpper
 let renderer,scene,camera,controls,sun,hemi,pmrem,environment;
 let activeModel=null,activeSeason='spring',loadToken=0,frameStart=performance.now(),frameCount=0,fps=0,assets=[],errorMessage='';
 const cache=new Map();const loader=new GLTFLoader();
-let farmState=null,requestedSeason=null,requestedSpace=null,techEffects=null,townGroup=null,townRaycaster=new THREE.Raycaster(),townPointer=new THREE.Vector2();
+let farmState=null,requestedSeason=null,requestedSpace=null,techEffects=null,techAnim=0,townGroup=null,townRaycaster=new THREE.Raycaster(),townPointer=new THREE.Vector2();
 const cropUniforms={farmMask:{value:new Float32Array(10)},farmGrowth:{value:1}};
 function syncFarm(state){
  const changed=farmState&&farmState.space!==state.space;farmState=state;document.title='穿越京西稻 · '+(state.activity==='processing'?'御米作坊':state.activity==='sales'?'时空交易行':state.activity==='variety'?'御贡图鉴':SEASONS[state.season].label);const mask=state.activity==='processing'||state.activity==='sales'||state.activity==='variety'?Array(10).fill(true):state.season==='winter'?state.previousPlots:state.harvested?Array(10).fill(false):state.plots;
@@ -29,12 +29,42 @@ function syncFarm(state){
  applyTechEffects(state.story?.tech||{});
 }
 function applyTechEffects(tech){
- if(!scene)return;if(!techEffects){techEffects=new THREE.Group();techEffects.name='SystemTechEffects';scene.add(techEffects);}
- while(techEffects.children.length){const o=techEffects.children.pop();o.geometry?.dispose();o.material?.dispose();}
- const mat=new THREE.MeshBasicMaterial({color:0xffc857,transparent:true,opacity:.82});
- if(tech.plow){const g=new THREE.TorusGeometry(1.2,.08,8,24);const m=new THREE.Mesh(g,mat.clone());m.position.set(-12,.35,-2);m.rotation.x=Math.PI/2;techEffects.add(m);}
- if(tech.compost){const g=new THREE.SphereGeometry(.5,12,8);const m=new THREE.Mesh(g,mat.clone());m.position.set(7,.8,-8);m.scale.set(2,.25,2);techEffects.add(m);}
- if(tech.crab){const g=new THREE.TorusGeometry(.8,.12,8,16);const m=new THREE.Mesh(g,mat.clone());m.position.set(0,.45,7);m.rotation.x=Math.PI/2;techEffects.add(m);}
+ if(!scene||!renderer)return;if(techAnim){cancelAnimationFrame(techAnim);techAnim=0;}
+ if(!techEffects){techEffects=new THREE.Group();techEffects.name='SystemTechEffects';scene.add(techEffects);}
+ while(techEffects.children.length){const o=techEffects.children.pop();o.traverse(c=>{c.geometry?.dispose();c.material?.dispose();});}
+ const wood=new THREE.MeshStandardMaterial({color:0x6f4d2e,roughness:.85,transparent:true,opacity:0});
+ const iron=new THREE.MeshStandardMaterial({color:0x7d766b,roughness:.5,metalness:.35,transparent:true,opacity:0});
+ const soil=new THREE.MeshStandardMaterial({color:0x5a4632,roughness:.95,transparent:true,opacity:0});
+ const shell=new THREE.MeshStandardMaterial({color:0x8f4534,roughness:.7,transparent:true,opacity:0});
+ const glowMat=()=>new THREE.MeshBasicMaterial({color:0xffd98a,transparent:true,opacity:0});
+ const box=(w,h,d,m)=>new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);
+ if(tech.plow){
+  const plow=new THREE.Group(),beam=box(2.3,.13,.13,wood),handle=box(.13,1.05,.13,wood),base=box(.2,.55,.5,wood),share=box(.55,.28,.66,iron);
+  beam.position.set(-.2,1.05,0);beam.rotation.z=.16;handle.position.set(.85,.55,0);handle.rotation.z=-.35;base.position.set(-.55,.5,0);share.position.set(-.95,.16,0);share.rotation.z=.55;
+  plow.add(beam,handle,base,share);plow.traverse(o=>{if(o.isMesh)o.castShadow=true;});
+  plow.position.set(-12,.05,-2);plow.rotation.y=.6;techEffects.add(plow);
+ }
+ if(tech.compost){
+  const g=new THREE.Group(),heap=box(1.7,.24,1.7,soil);heap.position.y=.12;heap.castShadow=true;g.add(heap);
+  for(let i=0;i<14;i++){const p=new THREE.Mesh(new THREE.SphereGeometry(.07,6,4),glowMat());p.position.set((Math.random()-.5)*1.5,.35+Math.random()*1.3,(Math.random()-.5)*1.5);p.userData={rise:.0035+Math.random()*.004,phase:Math.random()*6.28};g.add(p);}
+  g.position.set(7,0,-8);techEffects.add(g);
+ }
+ if(tech.crab){
+  const g=new THREE.Group();
+  for(let i=0;i<3;i++){const c=new THREE.Group(),body=new THREE.Mesh(new THREE.SphereGeometry(.16,8,6),shell);body.scale.set(1.5,.6,1);const cl=box(.1,.07,.14,shell),cr=box(.1,.07,.14,shell);cl.position.set(.26,0,.12);cr.position.set(.26,0,-.12);c.add(body,cl,cr);c.traverse(o=>{if(o.isMesh)o.castShadow=true;});c.position.set(-1.1+i*1.1,.09,(i-1)*.55);c.userData={drift:i%2?1:-1,speed:.005+.002*i,baseX:c.position.x};c.rotation.y=c.userData.drift>0?0:Math.PI;g.add(c);}
+  g.position.set(0,0,7);techEffects.add(g);
+ }
+ renderer.shadowMap.needsUpdate=true;
+ const t0=performance.now(),statics=[wood,iron,soil,shell];
+ (function step(){
+  const k=Math.min(1,(performance.now()-t0)/700),now=performance.now();
+  statics.forEach(m=>m.opacity=.95*k);
+  techEffects.traverse(o=>{
+   if(o.isMesh&&o.userData.rise){o.position.y+=o.userData.rise;if(o.position.y>1.85)o.position.y=.3;o.material.opacity=k*(.85-.45*(o.position.y-.3)/1.55)*(.8+.2*Math.sin(now*.004+o.userData.phase));}
+   if(o.userData?.drift){o.position.x+=o.userData.drift*o.userData.speed;if(Math.abs(o.position.x-o.userData.baseX)>.7){o.userData.drift*=-1;o.rotation.y=o.userData.drift>0?0:Math.PI;}}
+  });
+  techAnim=requestAnimationFrame(step);
+ })();
 }
 function townLabel(text){const c=document.createElement('canvas');c.width=256;c.height=64;const x=c.getContext('2d');x.fillStyle='#4d2b12';x.fillRect(4,4,248,56);x.strokeStyle='#e9c66b';x.strokeRect(4,4,248,56);x.fillStyle='#ffe8a0';x.font='bold 26px serif';x.textAlign='center';x.fillText(text,128,41);const t=new THREE.CanvasTexture(c);const s=new THREE.Sprite(new THREE.SpriteMaterial({map:t,transparent:true}));s.scale.set(5,1.25,1);return s;}
 function buildTownHotspots(){if(townGroup)scene.remove(townGroup);townGroup=new THREE.Group();townGroup.name='ShangzhuangTownHotspots';const spots=[['老宅','farm',[-12,1,-4],0x8f6a3c],['作坊','processing',[-2,1,-8],0xb67b3e],['市场','sales',[6,1,-5],0xd1a34a],['酒楼','sales',[12,1,1],0x9e4937],['社交驿站','social',[5,1,7],0x6f9c70]];for(const [name,activity,pos,color] of spots){const m=new THREE.Mesh(new THREE.BoxGeometry(3,2,2.5),new THREE.MeshStandardMaterial({color,roughness:.8}));m.position.set(...pos);m.userData.activity=activity;m.castShadow=true;m.add(townLabel(name));m.children[0].position.y=1.7;townGroup.add(m);}scene.add(townGroup);}
