@@ -10,8 +10,8 @@
 ├─ index.html          ← 必须在这一层
 ├─ app.js
 ├─ *.js / *.css
-├─ *.glb               ← 四季模型（已量化压缩）
-├─ three.module.js     ← three.js r186（min 构建）
+├─ *.glb               ← 四季模型（原始未压缩）
+├─ three.module.js     ← three.js r186（官方原版）
 ├─ three.core.js
 ├─ GLTFLoader.js 等 addon
 ├─ manifest.json  alignment.json  town-map.jpg  shangzhuang.jpg
@@ -39,7 +39,7 @@ Branch: main    Folder: /(root)    → Save
 
 ## 体积
 
-四季 GLB 已用 `@gltf-transform/cli` 做顶点量化 + 网格简化（27.2 MB → 13.6 MB），
-three.js 换成 terser 压缩的 min 构建（约 2.2 MB → 0.75 MB）。
+四季 GLB 与 three.js 均为**原始未压缩版本**：量化/简化会把树冠叶片削没、并与静态合批
+冲突（2026-10-06 实测后拍板撤销，美术资源优先于体积）。
 模型**按季懒加载**：首屏只解析当前季，其余季在空闲时预取，进入时再解析；
 内存里最多保留 3 季，更早的会自动释放显存。
