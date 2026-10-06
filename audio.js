@@ -71,6 +71,8 @@ export function sfx(kind){
  else if(kind==='detect'){tone({type:'sine',from:1400,to:420,dur:.22,gain:.08});}
  else if(kind==='choice'){tone({type:'square',from:320,to:300,dur:.06,gain:.035});}
  else if(kind==='reward'){[660,880,1180].forEach((f,i)=>tone({type:'sine',from:f,to:f,dur:.34,gain:.07,delay:i*.09}));}
+ // 耕织图修复（Q-9.5）：五声音阶琶音模拟古琴拨弦，逐层显画时伴音，约 3.5 秒。
+ else if(kind==='gengzhi'){[262,294,330,392,440,523,587,659,784,880].forEach((f,i)=>tone({type:'triangle',from:f,to:f*.996,dur:.9,gain:.05,delay:i*.35}));}
 }
 export function toggle(){
  on=!on;

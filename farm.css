@@ -67,3 +67,90 @@ body.farm-mode{display:block;background:#edf0e7;color:#243f33;min-height:100vh}
 .event-cost{display:block;margin-top:7px;padding-top:7px;border-top:1px dashed #b9a173;font-size:11px;line-height:1.65;color:#8a7448}
 .event-choices button:disabled .event-cost{color:#a5867c}
 .plant-control input:disabled{opacity:.5}
+
+/* ---- 包 B / Q-9.14：稻种选择器 · 生长等待 · 年景 · 家业升级面板 ---- */
+.seed-picker{display:grid;grid-template-columns:repeat(auto-fill,minmax(152px,1fr));gap:7px;margin:12px 0 4px}
+.seed-chip{display:flex;flex-direction:column;gap:2px;text-align:left;border:1px solid #b7c3a5;background:#f6f8ec;border-radius:5px;padding:8px 10px;color:#2e4c36;cursor:pointer;font-family:inherit}
+.seed-chip b{font:16px KaiTi,serif}
+.seed-chip span{font-size:10px;color:#788566;line-height:1.5}
+.seed-chip.on{border-color:#365b42;background:#e6f0d4;box-shadow:inset 0 0 0 1px #365b42}
+.seed-chip:hover{border-color:#8d9a4d}
+.growth-line{font-size:12px;color:#677360;margin:6px 0 0}
+.omen-chip{color:#8b5a2b}
+.omen-event{border-color:#c9a76a!important;background:#fdf8ea!important}
+.upgrade-panel{margin-top:16px;border-top:1px dashed #c3cbb0;padding-top:12px}
+.upgrade-panel summary{font:19px KaiTi,serif;cursor:pointer;color:#2f4f38}
+.upgrade-panel>p{margin-top:10px}
+.upgrade-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px dotted #d8ddc9}
+.upgrade-row>div{display:flex;flex-direction:column;gap:2px}
+.upgrade-row b{font-size:11px;color:#3b5c40;letter-spacing:1px}
+.upgrade-row span{font:16px KaiTi,serif;color:#2f4f38}
+.upgrade-row small{font-size:10px;color:#7c866f}
+.upgrade-row button{border:1px solid #b2bfa0;background:#f5f7eb;color:#37583a;border-radius:4px;padding:8px 11px;font-size:11px;font-family:inherit;white-space:nowrap}
+.upgrade-row button:disabled{opacity:.55;cursor:default}
+.upgrade-row.done{opacity:.7}
+.upgrade-max{font-size:11px;color:#7c866f;font-style:normal}
+.farm-plots button small{color:#6d7c62}
+
+/* ================= 包 J1（第六轮）· 节气倒计时 · 限时差事 · 随机事件 · 声望 ================= */
+/* —— 节气倒计时条：朱红渐空，最后一日闪烁，过窗口转暗红警示 —— */
+.term-bar{background:#fffdf6;border:1px solid #d9cfa8;border-left:4px solid #b4462f;border-radius:9px;padding:13px 20px 11px;margin-bottom:14px;box-shadow:0 5px 18px #293d2410}
+.term-head{display:flex;align-items:baseline;gap:12px;margin-bottom:9px}
+.term-head b{font:20px KaiTi,serif;letter-spacing:2px;color:#8d3a26}
+.term-head span{margin-left:auto;font-size:11px;color:#8a7a62}
+.term-track{height:8px;background:#efe7d2;border-radius:5px;overflow:hidden}
+.term-track span{display:block;height:100%;background:linear-gradient(90deg,#c95b3c,#a8341f);transition:width .8s ease}
+.term-say{margin:8px 0 0;font:13px KaiTi,serif;color:#7b6a52;letter-spacing:1px}
+.term-say em{font-style:normal;font-size:11px;color:#a3947c;font-family:'Microsoft YaHei',sans-serif}
+.term-bar.urgent{border-left-color:#c0271a;animation:termPulse 1.1s ease-in-out infinite}
+.term-bar.urgent .term-track span{background:linear-gradient(90deg,#e0574a,#b71c0c)}
+@keyframes termPulse{0%,100%{box-shadow:0 5px 18px #293d2410}50%{box-shadow:0 5px 22px #c0271a55}}
+.term-bar.over{border-left-color:#6b6257;background:#f4f1ea}
+.term-bar.over .term-track span{background:linear-gradient(90deg,#8b8073,#5f574c)}
+.term-bar.over .term-head b{color:#5f574c}
+/* —— 限时差事卡：朱印风「剩 N 日」标签 —— */
+.errand-board{margin-bottom:16px}
+.errand-card{border:1px solid #e0d3b6;background:#fffbef;border-radius:7px;padding:14px 15px;margin-bottom:10px;position:relative}
+.errand-card.urgent{border-color:#d9a08c;background:#fff6f0}
+.errand-card header{display:flex;align-items:center;gap:10px}
+.errand-card h3{font:19px KaiTi,serif;margin:0;letter-spacing:1px;color:#3d5340}
+.errand-days{margin-left:auto;font-size:10px;letter-spacing:1px;color:#fff4e2;background:#a8341f;border-radius:3px;padding:3px 8px;white-space:nowrap}
+.errand-card.urgent .errand-days{background:#c0271a;animation:termPulse 1.1s ease-in-out infinite}
+.errand-card>p{font-size:11px;line-height:1.8;color:#78806b;margin:9px 0 10px}
+.errand-need{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;margin:0 0 12px;font-size:11px}
+.errand-need dt{color:#9b8a6c;white-space:nowrap}
+.errand-need dd{margin:0;color:#4d5c4a;line-height:1.6}
+.errand-need dd.bad{color:#a8341f}
+.errand-acts{display:flex;gap:8px;align-items:center}
+.errand-acts .farm-primary{margin:0;flex:1;padding:11px;font-size:12px;letter-spacing:1px}
+.errand-giveup{border:1px solid #cdc3ac;background:#f6f3e9;color:#7a7263;border-radius:5px;padding:11px 14px;font-size:11px;font-family:inherit;cursor:pointer}
+.errand-giveup:hover{background:#ede8da;color:#5f574c}
+/* —— 随机事件：天灾按压条 —— */
+.disaster-event{border-color:#e2b3a3!important;background:#fff8f4!important}
+.disaster-game{margin:14px 0 10px}
+.disaster-game .dg-track{height:14px;background:#f0dcd3;border-radius:7px;overflow:hidden;border:1px solid #e0c2b5}
+.disaster-game .dg-track span{display:block;height:100%;background:linear-gradient(90deg,#e0733f,#b83a17);transition:width .08s linear}
+.dg-row{display:flex;align-items:baseline;gap:6px;margin:9px 0}
+.dg-count{font:24px Georgia,serif;color:#a8341f;min-width:30px}
+.dg-row small{font-size:10px;color:#a3947c}
+.dg-timer{margin-left:auto;font-size:11px;color:#8a7a62;font-variant-numeric:tabular-nums}
+.dg-hit{width:100%;border:1px solid #a8341f;background:#b4462f;color:#fff4e2;border-radius:6px;padding:16px;font:17px KaiTi,serif;letter-spacing:3px;cursor:pointer;user-select:none;font-family:inherit}
+.dg-hit:hover:not(:disabled){background:#c95b3c}
+.dg-hit:active:not(:disabled){transform:translateY(1px);background:#9c2f1c}
+.dg-hit:disabled{opacity:.6;cursor:default}
+.dg-hit.arming{background:#8d2a14;box-shadow:0 0 0 3px #b4462f33 inset}
+/* —— 人祸 / 奇遇 —— */
+.choice-event{border-color:#dcd0ae!important;background:#fffdf3!important}
+.fortune-event{border-color:#c3d2a4!important;background:#fbfdf1!important}
+.fortune-event .farm-kicker{color:#5e7a3a}
+.event-cost{display:block;font-size:10px;color:#8e9683;line-height:1.6;margin-top:4px}
+.ev-queue{display:block;margin-top:10px;font-size:10px;color:#a3947c;letter-spacing:1px}
+.farm-resources small{font-size:9px;color:#98a08c;margin-left:2px}
+@media(max-width:780px){
+ .term-bar{padding:11px 14px 9px}
+ .term-head b{font-size:17px}
+ .term-head span{font-size:10px}
+ .errand-need{grid-template-columns:1fr;gap:1px}
+ .errand-need dt{margin-top:5px;color:#a3947c}
+ .dg-hit{padding:14px;font-size:15px;letter-spacing:2px}
+}
