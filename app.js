@@ -7,6 +7,8 @@ import {GLTFLoader} from './GLTFLoader.js';
 import {RoomEnvironment} from './RoomEnvironment.js';
 import {mergeGeometries} from './BufferGeometryUtils.js';
 
+// 能执行到这里，说明 three 与全部模块都解析成功了 —— 用于部署自检（见 index.html 的 #boot-guard）。
+window.__JINGXI_MODULE_LOADED=true;
 const ALIGN=await (await fetch('./alignment.json',{cache:'no-store'})).json();
 const $=s=>document.querySelector(s);
 const SEASONS={
@@ -302,4 +304,4 @@ const materials=Array.isArray(o.material)?o.material:[o.material];for(const m of
 $('#reset-view').addEventListener('click',()=>{setView(activeSeason);toast('已恢复田野镜头');});
 document.addEventListener('pointerdown',()=>{audioUnlock();if(farmState)audioScene({water:farmState.water,ecology:farmState.ecology});},{once:true});
 window.jingxiAudio={toggle:()=>{const on=audioToggle();toast(on?'音效已开启':'音效已关闭');return on;}};
-try{init();assets=(await (await fetch('./manifest.json')).json()).files;const game=mountFarm({onChange:syncFarm});mountImmersive(game);resizeView();}catch(err){$('#farm-root').textContent='页面初始化失败：'+err.message;diagnostics.errors.push(String(err));}
+try{init();assets=(await (await fetch('./manifest.json')).json()).files;const game=mountFarm({onChange:syncFarm});mountImmersive(game);resizeView();window.__JINGXI_BOOTED=true;}catch(err){$('#farm-root').textContent='页面初始化失败：'+err.message;diagnostics.errors.push(String(err));}
