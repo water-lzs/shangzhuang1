@@ -2,10 +2,19 @@ body.farm-mode.immersive{height:100dvh;overflow:hidden;background:#243c32}
 .farm-mode.immersive #app{position:relative;width:100%;height:100dvh;min-height:0;padding:0;overflow:hidden;background:transparent}
 .immersive #viewport{position:absolute!important;inset:0!important;width:100%!important;height:100%!important}
 .immersive[data-space=town] #viewport{visibility:hidden}
-.immersive #activity-tabs,.immersive footer,.immersive #system-panel,.immersive #app>section{display:none!important}
-.immersive .topbar{top:18px;left:24px;right:24px;z-index:12;pointer-events:none}.immersive .topbar button,.immersive .brand{pointer-events:auto}.immersive .brand{background:#fff7dedb;padding:10px 14px;border-radius:8px}.immersive .top-right{background:#fff7dedb;border-radius:8px;padding:6px}.immersive #toggle-details{display:none!important}
+.immersive #activity-tabs,.immersive footer,.immersive #system-panel,.immersive #app>section,.immersive #asset-notice{display:none!important}
+/* 沉浸模式下 FPS 读数与「展开面板」属于调试信息，隐藏掉 */
+.immersive .performance{display:none!important}
+.immersive .topbar{top:18px;left:24px;right:24px;z-index:12;pointer-events:none}.immersive .topbar button,.immersive .brand{pointer-events:auto}.immersive .brand{background:#fff7dedb;padding:10px 14px;border-radius:8px}.immersive .top-right{background:transparent!important;padding:0!important;} .immersive .top-right button{background:#fff7dedb;border:1px solid rgba(73,79,51,.2);border-radius:6px;padding:8px 12px} .immersive #toggle-details{display:none!important}
 #world-shell{position:absolute;inset:0;pointer-events:none}#town-map{position:absolute;inset:0;background:#a6b394;pointer-events:auto;overflow:hidden;touch-action:none}#town-art{position:absolute;width:max(100vw,177.78vh);height:max(100vh,56.25vw);left:50%;top:50%;margin-left:min(-50vw,-88.89vh);margin-top:min(-50vh,-28.125vw);transform-origin:center}#town-art img{width:100%;height:100%;object-fit:fill;pointer-events:none;user-select:none}
-#world-status{position:absolute;top:106px;left:24px;padding:10px 16px;border-left:3px solid #bc964a;background:#fff8e5e8;color:#3a4935;font:13px 'Microsoft YaHei';border-radius:3px}
+#town-fallback{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);max-width:78%;text-align:center;background:#2c453aee;color:#ffeec4;border:1px solid #d9bd7d;border-radius:8px;padding:16px 22px;font:13px/1.9 'Microsoft YaHei';z-index:5}
+#world-status{position:absolute;top:106px;left:24px;padding:10px 16px;border-left:3px solid #bc964a;background:#fff8e5e8;color:#3a4935;font:13px 'Microsoft YaHei';border-radius:3px;display:flex;flex-direction:column;gap:4px;line-height:1.5;pointer-events:auto}
+#world-status .ws-line{white-space:nowrap}
+#world-status b{color:#2f4a38}
+#world-status .ws-wallet{border-top:1px dashed #cbb98b;padding-top:4px;margin-top:2px}
+#world-status .ws-wallet b{color:#a8752b;font-size:16px;letter-spacing:.5px}
+#world-status .ws-wallet b.flash{animation:wallet-flash 900ms ease}
+@keyframes wallet-flash{0%{color:#d4a12f;transform:scale(1.35);text-shadow:0 0 12px #e8b93faa}60%{color:#d4a12f;transform:scale(1.12)}100%{color:#a8752b;transform:scale(1);text-shadow:none}}
 #world-toolbar{position:absolute;bottom:30px;left:50%;transform:translateX(-50%);display:flex;gap:8px;width:max-content;max-width:95%;pointer-events:auto;padding:9px;background:#203a32db;border:1px solid #b9a875;border-radius:12px;backdrop-filter:blur(10px)}#world-toolbar button{background:#fff6d9;color:#354638;border:1px solid #c6af77;border-radius:6px;padding:12px 18px;white-space:nowrap}
 .world-point{position:absolute;transform:translate(-50%,-50%);border:1px solid #f2d28b;border-radius:22px;background:#31483be8;color:#fff5d6;padding:10px 18px;box-shadow:0 3px 18px #16291f66;pointer-events:auto;cursor:pointer;font:14px 'Microsoft YaHei'}.world-point:hover{background:#8c6532;outline:3px solid #ffe7a944}.world-point::before{content:'◆';color:#efd184;margin-right:8px}#world-points{position:absolute;inset:0;pointer-events:none}
 #world-hint{position:absolute;bottom:7px;width:100%;text-align:center;color:#fffbe6;text-shadow:0 1px 4px #000;font-size:11px}

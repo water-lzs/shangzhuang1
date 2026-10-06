@@ -18,3 +18,52 @@ body.farm-mode{display:block;background:#edf0e7;color:#243f33;min-height:100vh}
 @media(min-width:1400px){.farm-mode #app{padding-top:410px}.farm-mode #viewport{height:460px}.farm-heading{top:-290px}}
 @media(max-width:780px){.farm-mode #app{padding:305px 15px 25px}.farm-mode #viewport{height:345px}.farm-mode .topbar{left:18px;right:18px;top:19px}.farm-mode .brand{font-size:18px}.farm-mode .brand small{font-size:6px}.farm-mode .top-right{gap:6px}.farm-mode .top-right button{display:none}.farm-heading{top:-205px}.farm-heading h1{font-size:28px}.farm-columns{grid-template-columns:1fr}.farm-stats>div{padding:12px 9px}.farm-stats strong{font-size:18px}.farm-stats span{font-size:10px}.farm-stats small{font-size:9px;line-height:1.5;display:block}.farm-card{padding:17px}.farm-plots{gap:6px}.farm-plots button{padding:8px 6px;min-height:75px}.farm-resources{gap:11px}.farm-mode nav button{padding:7px 13px}}
 .space-switch{border:1px solid #d8ad5b;background:#5f4825;color:#ffe9a8;border-radius:8px;padding:8px 14px;cursor:pointer;margin-top:8px}
+
+/* ---- 隐性反馈：模糊描述模式 / 粮仓 / 检测 ---- */
+.farm-stats.fuzzy strong{display:block;font-size:13px;font-weight:600;line-height:1.7;margin:6px 0 4px;color:#4c5a48;font-family:'Microsoft YaHei',sans-serif}
+.farm-stats.debug strong{color:#8a6d2f}
+.muted{color:#838b7a!important;font-size:12px!important;line-height:1.8}
+.debug-note{display:block;margin-top:8px;font-size:10px;color:#a08a52;border-top:1px dashed #ddd0a8;padding-top:6px}
+.detect-btn,.granary-btn{font-size:11px;padding:7px 12px;border:1px solid #b5a173;background:#f5efdc;color:#3f5540;border-radius:5px;cursor:pointer;margin-left:8px}
+.granary-btn{margin-left:auto;padding:5px 10px;font-size:10px}
+.detect-btn:hover:not(:disabled),.granary-btn:hover{background:#e8dfc2}
+.detect-btn:disabled{opacity:.45;cursor:not-allowed}
+.granary-now{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 0;border-bottom:1px solid #e4e5d5;font-size:12px}
+.granary-now strong{font:26px Georgia,serif;color:#9b773d}
+.granary-now strong small{font-size:12px}
+.granary-history{list-style:none;padding:10px 0;font-size:12px;line-height:2}
+.granary-history li{display:flex;align-items:center;gap:10px;border-bottom:1px dashed #e4e5d5;padding:4px 0}
+.granary-history li b{margin-left:auto;color:#7d6136}
+.q-chip{display:inline-block;width:15px;height:15px;border-radius:50%;border:1px solid #00000022;cursor:help;vertical-align:-2px}
+.q-gold{background:radial-gradient(circle at 35% 30%,#ffe9a3,#d4a12f 70%,#a97a1b)}
+.q-silver{background:radial-gradient(circle at 35% 30%,#f6f8fa,#b9bfc4 70%,#8d949a)}
+.q-bronze{background:radial-gradient(circle at 35% 30%,#e3b183,#a9713f 70%,#7d4f28)}
+.q-gray{background:radial-gradient(circle at 35% 30%,#d8d8d2,#8b8b84 70%,#5f5f5a)}
+.detect-panel{position:fixed;top:74px;left:50%;transform:translate(-50%,-12px);z-index:60;padding:16px 22px;background:#1f3226f2;color:#f2ecd6;border:1px solid #c8ad72;border-radius:9px;box-shadow:0 14px 44px #0d1c1455;font:13px 'Microsoft YaHei';opacity:0;pointer-events:none;transition:opacity .35s,transform .35s}
+.detect-panel.show{opacity:1;transform:translate(-50%,0)}
+.detect-panel b{display:block;font-size:14px;color:#f0d79c;margin-bottom:9px;letter-spacing:1px}
+.detect-panel div{display:flex;gap:16px;justify-content:space-between;line-height:2}
+.detect-panel div span{color:#b9c8b2}
+.detect-panel div strong{color:#ffe6a8}
+.detect-panel small{display:block;margin-top:10px;font-size:10px;color:#9aa895}
+
+/* ---- 包 O：季末结算单 ---- */
+.settle-list{list-style:none;padding:8px 0;font-size:12px;line-height:2.1}
+.settle-list li{display:flex;justify-content:space-between;border-bottom:1px dashed #e4e5d5;padding:2px 0}
+.settle-list li span{color:#6b7566}
+.settle-list b.in{color:#8a6d2f}
+.settle-list b.out{color:#a8534a}
+.settle-net{display:flex;justify-content:space-between;align-items:baseline;padding:10px 0;border-top:2px solid #d9d3bb;margin-top:4px}
+.settle-net span{font-size:12px;color:#4c5a48}
+.settle-net strong{font:20px Georgia,serif}
+.settle-net strong.in{color:#8a6d2f}
+.settle-net strong.out{color:#a8534a}
+
+/* ---- 包 P：抉择代价 / 买种 / 雇短工 ---- */
+.farm-tools{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 12px}
+.tool-btn{font-size:11px;padding:8px 12px;border:1px solid #b5a173;background:#f5efdc;color:#3f5540;border-radius:5px;cursor:pointer}
+.tool-btn:hover:not(:disabled){background:#e8dfc2}
+.tool-btn:disabled{opacity:.45;cursor:not-allowed}
+.event-cost{display:block;margin-top:7px;padding-top:7px;border-top:1px dashed #b9a173;font-size:11px;line-height:1.65;color:#8a7448}
+.event-choices button:disabled .event-cost{color:#a5867c}
+.plant-control input:disabled{opacity:.5}

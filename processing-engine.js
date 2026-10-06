@@ -1,3 +1,6 @@
+import {ECON} from './economy.js';
+import {awardFragment} from './variety-engine.js';
+import {nextRandom} from './rng.js';
 export const RECIPES={
  riceball:{name:'饭团',glyph:'团',rice:2,base:12,unit:'份',cost:1,requires:[],step:'塑形'},
  flour:{name:'米粉',glyph:'粉',rice:3,base:18,unit:'份',cost:1,requires:[],step:'磨粉'},
@@ -29,7 +32,9 @@ export function normalizeWorkshop(w){
 export const targetTime=(w,i)=>1600+i*ROUTES[w.route].interval;
 export const duration=w=>targetTime(w,NOTE_COUNT-1)+ROUTES[w.route].good+650;
 export function completion(a){return Math.max(0,Math.min(1,a.hits.reduce((n,h)=>n+(h||0),0)/NOTE_COUNT-a.strays*.025));}
-export function processEstimate(w,recipe,score){const r=RECIPES[recipe];return Math.floor(r.base*(.5+score)*ROUTES[w.route].output);}
+// 包 O：加工损耗随技能等级下降——一个配方没学时 30%，每多学一个降 2.5%，最低 10%。
+export const processLoss=w=>{const n=w?.learned?.length||0;return Math.max(ECON.lossMin,Math.min(ECON.lossMax,ECON.lossMax-n*ECON.lossStep));};
+export function processEstimate(w,recipe,score){const r=RECIPES[recipe]||{};const route=ROUTES[w.route]||ROUTES.traditional;return Math.max(1,Math.floor((r.base||0)*(.5+score)*route.output*(1-processLoss(w))));}
 function tick(w,elapsed){const a=w.active;a.elapsed=Math.max(a.elapsed,Math.min(duration(w),elapsed));for(let i=0;i<NOTE_COUNT;i++)if(a.hits[i]===null&&a.elapsed>targetTime(w,i)+ROUTES[w.route].good)a.hits[i]=0;}
 export function reduceProcessing(current,action){
  const s=structuredClone(current);s.workshop??=newWorkshop();const w=s.workshop;let error=null;
@@ -54,6 +59,8 @@ export function reduceProcessing(current,action){
   else{const score=completion(a),r=RECIPES[a.recipe],quantity=processEstimate(w,a.recipe,score);w.foods[a.recipe]+=quantity;w.completed++;const point=score>=.5?1:0;w.points+=point;
    w.last={id:a.id,recipe:a.recipe,name:r.product||r.name,completion:Math.round(score*100),quantity,unit:r.unit,rice:r.rice,route:w.route,point,perfect:a.hits.filter(x=>x===1).length,good:a.hits.filter(x=>x===.65).length,miss:a.hits.filter(x=>!x).length,strays:a.strays};
    s.log.unshift(`加工${r.product||r.name}：完成度 ${w.last.completion}%，入库 ${quantity}${r.unit}，消耗 ${r.rice}kg 稻米。`);s.log=s.log.slice(0,8);w.active=null;
+   // 耕织图碎片：作坊每完成一批就有机会从旧纸堆里翻出一片
+   if(nextRandom(s)<.35)awardFragment(s,'process');
   }break;
  default:fail('未知加工操作。');
  }

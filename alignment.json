@@ -3,6 +3,8 @@
   "width": 1200,
   "height": 900,
   "pixelRatio": 1,
+  "maxPixelRatio": 2,
+  "minQualityScale": 0.7,
   "shadowSize": 256,
   "fov": 50,
   "grain": 7,

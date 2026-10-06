@@ -1,4 +1,5 @@
 import {mountImmersive} from './immersive.js';
+import {unlock as audioUnlock,setScene as audioScene,sfx as audioSfx,isOn as audioOn,toggle as audioToggle} from './audio.js';
 import {mountFarm} from './farm-ui.js';
 import * as THREE from 'three';
 import {OrbitControls} from './OrbitControls.js';
@@ -18,15 +19,68 @@ for(const [s,c]of Object.entries(SEASONS)){c.file='JingXi_Aligned_'+s[0].toUpper
 let renderer,scene,camera,controls,sun,hemi,pmrem,environment;
 let activeModel=null,activeSeason='spring',loadToken=0,frameStart=performance.now(),frameCount=0,fps=0,assets=[],errorMessage='';
 const cache=new Map();const loader=new GLTFLoader();
-let farmState=null,requestedSeason=null,requestedSpace=null,techEffects=null,techAnim=0,townGroup=null,townRaycaster=new THREE.Raycaster(),townPointer=new THREE.Vector2();
+let farmState=null,requestedSeason=null,requestedSpace=null,techEffects=null,techAnim=0;
+let waterMats=[],riceMats=[],tintMats=[],ecoGroup=null,ecoAnim=0,prevFarm=null;
 const cropUniforms={farmMask:{value:new Float32Array(10)},farmGrowth:{value:1}};
 function syncFarm(state){
  const changed=farmState&&farmState.space!==state.space;farmState=state;document.title='穿越京西稻 · '+(state.activity==='processing'?'御米作坊':state.activity==='sales'?'时空交易行':state.activity==='variety'?'御贡图鉴':SEASONS[state.season].label);const mask=state.activity==='processing'||state.activity==='sales'||state.activity==='variety'?Array(10).fill(true):state.season==='winter'?state.previousPlots:state.harvested?Array(10).fill(false):state.plots;
  if(changed){const el=document.querySelector('#space-transition');el?.classList.add('show');setTimeout(()=>el?.classList.remove('show'),2000);}
- removeTownHotspots();
  cropUniforms.farmMask.value.set(mask.map(Number));cropUniforms.farmGrowth.value=state.season==='summer'?.55+.45*state.growth/3:1;
  if(requestedSeason!==state.season||requestedSpace!==state.space){requestedSeason=state.season;requestedSpace=state.space;changeSeason(state.season);}
  applyTechEffects(state.story?.tech||{});
+ syncSurface(state);syncAudio(state);
+}
+// 「隐性感知」：把 engine 里的数值翻译成看得见的画面——水色、稻色、生气、天光。
+function syncSurface(state){
+ if(!scene)return;
+ const w=Math.max(0,Math.min(1,state.water/100)),p=Math.max(0,Math.min(1,state.pests/100)),e=Math.max(0,Math.min(1,state.ecology/100));
+ const clear=new THREE.Color(0x8fd0e3),murk=new THREE.Color(0x6d6144);
+ for(const m of waterMats)m.color.copy(murk).lerp(clear,w);
+ const healthy=new THREE.Color(0xa9c46c),pale=new THREE.Color(0x8b9a72),sick=new THREE.Color(0x9c9756);
+ for(const m of riceMats)m.color.copy(healthy).lerp(pale,1-w).lerp(sick,p*.85);
+ const gray=1-e,cfg=SEASONS[activeSeason];
+ if(scene.fog){scene.fog.color.set(cfg.fog).lerp(new THREE.Color(0x9a9c97),gray*.72);scene.fog.density=cfg.density*(1+gray*.55);}
+ if(hemi)hemi.intensity=ALIGN.ambientIntensity*(1-gray*.22);
+ if(sun)sun.intensity=cfg.power*(1-gray*.18);
+ scene.environmentIntensity=.32*(1-gray*.45);
+ for(const m of tintMats){if(!m.userData.baseTint)m.userData.baseTint=m.color.clone();m.color.copy(m.userData.baseTint).lerp(new THREE.Color(0x8f918a),gray*.5);}
+ syncCreatures(e);
+}
+function syncCreatures(e){
+ if(!scene)return;
+ if(!ecoGroup)buildCreatures();
+ const frog=e>=.7,dragon=e>=.4,egret=e>=.7;
+ for(const o of ecoGroup.children){const k=o.userData.kind;o.visible=(k==='frog'&&frog)||(k==='dragonfly'&&dragon)||(k==='egret'&&egret);}
+}
+function buildCreatures(){
+ ecoGroup=new THREE.Group();ecoGroup.name='EcoCreatures';
+ const frogMat=new THREE.MeshStandardMaterial({color:0x4f7a3b,roughness:.85});
+ const wingMat=new THREE.MeshStandardMaterial({color:0xc8b780,roughness:.6,transparent:true,opacity:.8,side:THREE.DoubleSide});
+ const birdMat=new THREE.MeshStandardMaterial({color:0xf0f2ea,roughness:.75});
+ for(let i=0;i<4;i++){const f=new THREE.Group();const body=new THREE.Mesh(new THREE.SphereGeometry(.13,8,6),frogMat);body.scale.set(1.25,.8,1);f.add(body);f.position.set(-8+i*5.2,.02,-9.4+(i%2)*18.6);f.userData={kind:'frog',baseY:.02,phase:i*1.7};ecoGroup.add(f);}
+ for(let i=0;i<6;i++){const d=new THREE.Group();const b=new THREE.Mesh(new THREE.CapsuleGeometry(.02,.22,3,6),wingMat);b.rotation.z=Math.PI/2;const l=new THREE.Mesh(new THREE.PlaneGeometry(.34,.09),wingMat),r=l.clone();l.position.x=-.16;r.position.x=.16;d.add(b,l,r);const bx=-10+i*4,by=.9+((i*37)%10)/14,bz=-8+(i%3)*7;d.position.set(bx,by,bz);d.userData={kind:'dragonfly',baseX:bx,baseY:by,baseZ:bz,phase:i*.9};ecoGroup.add(d);}
+ for(let i=0;i<2;i++){const g=new THREE.Group();const body=new THREE.Mesh(new THREE.SphereGeometry(.16,8,6),birdMat);body.scale.set(1.5,.75,.9);const neck=new THREE.Mesh(new THREE.CylinderGeometry(.035,.045,.42,6),birdMat);neck.position.set(.16,.26,0);const head=new THREE.Mesh(new THREE.SphereGeometry(.07,7,5),birdMat);head.position.set(.2,.48,0);g.add(body,neck,head);const bx=-14+i*11;g.position.set(bx,.2,10.5-i*3);g.userData={kind:'egret',baseX:bx,phase:i*2.2};ecoGroup.add(g);}
+ scene.add(ecoGroup);
+ const t0=performance.now();
+ (function step(){
+  const t=performance.now()-t0;
+  ecoGroup.children.forEach(o=>{const k=o.userData.kind,ph=o.userData.phase||0;
+   if(k==='frog')o.position.y=o.userData.baseY+Math.abs(Math.sin(t*.0016+ph))*.11;
+   else if(k==='dragonfly'){o.position.x=o.userData.baseX+Math.sin(t*.0009+ph)*1.7;o.position.z=o.userData.baseZ+Math.sin(t*.0018+ph)*.9;o.position.y=o.userData.baseY+Math.sin(t*.0032+ph)*.14;}
+   else o.position.x=o.userData.baseX+Math.sin(t*.00021+ph)*3.2;
+  });
+  ecoAnim=requestAnimationFrame(step);
+ })();
+}
+// 声音反馈：水质好有流水与鸟鸣，生态差几乎只剩风声。
+function syncAudio(state){
+ if(!audioOn()){prevFarm=state;return;}
+ if(prevFarm){
+  if(state.rice>prevFarm.rice)audioSfx('harvest');
+  else if(state.stamina<prevFarm.stamina)audioSfx(state.season==='spring'?'plant':'inspect');
+  else if(state.season!==prevFarm.season)audioSfx('reward');
+ }
+ prevFarm=state;audioScene({water:state.water,ecology:state.ecology});
 }
 function applyTechEffects(tech){
  if(!scene||!renderer)return;if(techAnim){cancelAnimationFrame(techAnim);techAnim=0;}
@@ -66,9 +120,6 @@ function applyTechEffects(tech){
   techAnim=requestAnimationFrame(step);
  })();
 }
-function townLabel(text){const c=document.createElement('canvas');c.width=256;c.height=64;const x=c.getContext('2d');x.fillStyle='#4d2b12';x.fillRect(4,4,248,56);x.strokeStyle='#e9c66b';x.strokeRect(4,4,248,56);x.fillStyle='#ffe8a0';x.font='bold 26px serif';x.textAlign='center';x.fillText(text,128,41);const t=new THREE.CanvasTexture(c);const s=new THREE.Sprite(new THREE.SpriteMaterial({map:t,transparent:true}));s.scale.set(5,1.25,1);return s;}
-function buildTownHotspots(){if(townGroup)scene.remove(townGroup);townGroup=new THREE.Group();townGroup.name='ShangzhuangTownHotspots';const spots=[['老宅','farm',[-12,1,-4],0x8f6a3c],['作坊','processing',[-2,1,-8],0xb67b3e],['市场','sales',[6,1,-5],0xd1a34a],['酒楼','sales',[12,1,1],0x9e4937],['社交驿站','social',[5,1,7],0x6f9c70]];for(const [name,activity,pos,color] of spots){const m=new THREE.Mesh(new THREE.BoxGeometry(3,2,2.5),new THREE.MeshStandardMaterial({color,roughness:.8}));m.position.set(...pos);m.userData.activity=activity;m.castShadow=true;m.add(townLabel(name));m.children[0].position.y=1.7;townGroup.add(m);}scene.add(townGroup);}
-function removeTownHotspots(){if(townGroup){scene.remove(townGroup);townGroup.traverse(o=>{o.geometry?.dispose();o.material?.dispose();});townGroup=null;}}
 function cropShader(material){
  if(material.userData.farmCrop)return;material.userData.farmCrop=true;
  material.onBeforeCompile=shader=>{
@@ -81,22 +132,36 @@ function cropShader(material){
  };
  material.customProgramCacheKey=()=> 'farm-crop-v1';
 }
-function resizeView(){if(!renderer)return;const r=document.querySelector('#viewport').getBoundingClientRect();camera.aspect=r.width/r.height;camera.updateProjectionMatrix();renderer.setSize(Math.min(1200,Math.round(r.width)),Math.min(900,Math.round(r.width<=1200?r.height:r.height*1200/r.width)),false);diagnostics.renderSize=[renderer.domElement.width,renderer.domElement.height];}
+function resizeView(){
+ if(!renderer)return;
+ const el=document.querySelector('#viewport');if(!el)return;
+ const r=el.getBoundingClientRect();
+ // 按容器真实尺寸渲染（不再硬顶 1200×900），并跟随设备像素比，避免大屏发糊。
+ // qualityScale 是自适应分辨率系数：帧率吃紧时由渲染循环下调，缓过来再升回去。
+ const base=Math.min(ALIGN.maxPixelRatio??2,window.devicePixelRatio||1);
+ const dpr=Math.max(ALIGN.minQualityScale??.7,base*qualityScale);
+ renderer.setPixelRatio(dpr);
+ renderer.setSize(Math.max(1,r.width),Math.max(1,r.height),false);
+ // 关键：相机宽高比取「实际绘制缓冲」的比例，竖屏/平板下才不会与 CSS 尺寸不一致而拉伸。
+ const buf=renderer.getDrawingBufferSize(new THREE.Vector2());
+ camera.aspect=buf.x/Math.max(1,buf.y);
+ camera.updateProjectionMatrix();
+ diagnostics.renderSize=[buf.x,buf.y];
+}
 
-let slowSamples=0,qualityScale=1,lastFrame=0,seasonStarted=0;
+let slowSamples=0,fastSamples=0,qualityScale=1,lastFrame=0,seasonStarted=0;
 const diagnostics={iteration:ALIGN.iteration,renderSize:[ALIGN.width,ALIGN.height],frameTimes:[],renderer:'Three.js WebGL',threeVersion:THREE.REVISION,modelLoaded:false,frames:[],errors:[],season:'spring',triangles:0,drawCalls:0,antialias:false,softShadows:true};
 window.addEventListener('error',e=>{diagnostics.errors.push(String(e.message));});
 window.addEventListener('unhandledrejection',e=>{diagnostics.errors.push(String(e.reason));});
 
 function init(){
  renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:'high-performance'});
- renderer.setPixelRatio(1);renderer.setSize(ALIGN.width,ALIGN.height,false);
+ renderer.setPixelRatio(Math.max(ALIGN.minQualityScale??.7,Math.min(ALIGN.maxPixelRatio??2,window.devicePixelRatio||1)*qualityScale));renderer.setSize(ALIGN.width,ALIGN.height,false);
  renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFShadowMap;
  renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.NoToneMapping;renderer.toneMappingExposure=1;
  renderer.shadowMap.autoUpdate=false;
  diagnostics.antialias=renderer.getContext().getContextAttributes().antialias;
  $('#viewport').appendChild(renderer.domElement);
- renderer.domElement.addEventListener('pointerdown',e=>{if(!townGroup)return;const r=renderer.domElement.getBoundingClientRect();townPointer.x=((e.clientX-r.left)/r.width)*2-1;townPointer.y=-((e.clientY-r.top)/r.height)*2+1;townRaycaster.setFromCamera(townPointer,camera);const hit=townRaycaster.intersectObjects(townGroup.children)[0];if(hit?.object.userData.activity)document.querySelector(`[data-activity="${hit.object.userData.activity}"]`)?.click();});
  scene=new THREE.Scene();camera=new THREE.PerspectiveCamera(ALIGN.fov,4/3,.1,240);
  controls=new OrbitControls(camera,renderer.domElement);controls.enableDamping=true;controls.dampingFactor=.08;controls.minDistance=5;controls.maxDistance=200;controls.maxPolarAngle=Math.PI*.55;controls.target.set(0,3,0);
  hemi=new THREE.HemisphereLight(0xe3f2fc,0xb5ad7c,1.35);scene.add(hemi);
@@ -106,10 +171,27 @@ function init(){
  const ground=new THREE.Mesh(new THREE.PlaneGeometry(140,140),new THREE.MeshStandardMaterial({color:0xd6d4b7,roughness:1}));ground.rotation.x=-Math.PI/2;ground.position.y=-.145;ground.receiveShadow=true;ground.name='BackdropGround';scene.add(ground);
  renderer.setAnimationLoop(t=>{
   if(lastFrame&&diagnostics.modelLoaded&&t-seasonStarted>4000){diagnostics.frameTimes.push(t-lastFrame);if(diagnostics.frameTimes.length>3600)diagnostics.frameTimes.shift();}lastFrame=t;controls.update();renderer.render(scene,camera);frameCount++;
-  if(t-frameStart>=1000){fps=Math.round(frameCount*1000/(t-frameStart));$('#fps').textContent=fps;diagnostics.frames.push({at:Math.round(t),season:activeSeason,fps});if(diagnostics.frames.length>180)diagnostics.frames.shift();frameStart=t;frameCount=0;if(diagnostics.modelLoaded&&fps<57)slowSamples++;else slowSamples=0;if(false&&slowSamples>=3&&qualityScale>.7){qualityScale=Math.max(.7,qualityScale-.1);renderer.setPixelRatio(Math.min(devicePixelRatio,qualityScale));slowSamples=0;}$('#viewport').dataset.diagnostics=JSON.stringify({...diagnostics,fps,viewport:{width:innerWidth,height:innerHeight,pixelRatio:renderer.getPixelRatio()},camera:camera.position.toArray(),target:controls.target.toArray()});}
+  if(t-frameStart>=1000){fps=Math.round(frameCount*1000/(t-frameStart));$('#fps').textContent=fps;diagnostics.frames.push({at:Math.round(t),season:activeSeason,fps});if(diagnostics.frames.length>180)diagnostics.frames.shift();frameStart=t;frameCount=0;
+   // 自适应分辨率：把渲染分辨率当阀门用，而不是把帧率锁死。
+   // 低于 40 fps 连续 3 秒 → 降一档（下限 ALIGN.minQualityScale）；高于 55 fps 连续 12 秒 → 升回一档。
+   // 两档之间有 15 fps 的回差，避免在阈值上反复抖动把画面弄得忽清忽糊。
+   if(diagnostics.modelLoaded){
+    if(fps<40){slowSamples++;fastSamples=0;}else if(fps>55){fastSamples++;slowSamples=0;}else{slowSamples=0;fastSamples=0;}
+    const floor=ALIGN.minQualityScale??.7;
+    if(slowSamples>=3&&qualityScale>floor){qualityScale=Math.max(floor,qualityScale-.1);slowSamples=0;resizeView();}
+    else if(fastSamples>=12&&qualityScale<1){qualityScale=Math.min(1,qualityScale+.05);fastSamples=0;resizeView();}
+   }
+   $('#viewport').dataset.diagnostics=JSON.stringify({...diagnostics,fps,qualityScale:Math.round(qualityScale*100)/100,viewport:{width:innerWidth,height:innerHeight,pixelRatio:renderer.getPixelRatio()},camera:camera.position.toArray(),target:controls.target.toArray()});}
   diagnostics.triangles=renderer.info.render.triangles;diagnostics.drawCalls=renderer.info.render.calls;
  });
- addEventListener('resize',resizeView);resizeView();
+ addEventListener('resize',resizeView);
+ addEventListener('orientationchange',()=>setTimeout(resizeView,120));
+ if(window.visualViewport)window.visualViewport.addEventListener('resize',resizeView);
+ if(window.ResizeObserver){const ro=new ResizeObserver(resizeView);ro.observe(document.querySelector('#viewport'));}
+ resizeView();
+ // 首屏布局（100dvh / 移动端地址栏收起等）落定前测量可能拿到瞬时值，再补两拍。
+ requestAnimationFrame(()=>resizeView());
+ setTimeout(resizeView,300);
 }
 function skyTexture(colors){
  const c=document.createElement('canvas');c.width=1024;c.height=768;const ctx=c.getContext('2d');
@@ -122,6 +204,50 @@ function skyTexture(colors){
  const tex=new THREE.CanvasTexture(c);tex.colorSpace=THREE.SRGBColorSpace;return tex;
 }
 function setView(season){const c=SEASONS[season];camera.position.fromArray(c.camera);controls.target.fromArray(c.target);controls.update();}
+const SEASON_ORDER=['spring','summer','autumn','winter'];
+// 按季懒加载：初始化只解析当前季，其余三季在空闲时按需预取、进入后再解析。
+// 四季模型静态合批后几何体常驻显存很可观，因此缓存只保留最近 MAX_CACHED_SEASONS 季，
+// 更早的季连同材质贴图一起 dispose，下次进入时重新走网络/HTTP 缓存。
+const MAX_CACHED_SEASONS=3;
+function modelURL(m){return './'+m.path.split('./').map(encodeURIComponent).join('./');}
+const prefetched=new Set();
+function prefetchModel(season){
+ const conn=navigator.connection;if(conn&&(conn.saveData||/2g|3g/.test(conn.effectiveType||'')))return;
+ if(cache.has(season)||prefetched.has(season))return;
+ const m=assets.find(a=>a.name===SEASONS[season].file)||assets.find(a=>a.name.toLowerCase().includes(season));
+ if(!m)return;
+ prefetched.add(season);
+ const url=modelURL(m);
+ const idle=window.requestIdleCallback||(fn=>setTimeout(fn,1200));
+ try{idle(()=>{fetch(url,{cache:'force-cache'}).then(r=>r.blob()).catch(()=>{prefetched.delete(season);});},{timeout:8000});}catch{prefetched.delete(season);}
+}
+// 当前季加载完后在空闲时把下一季拉进浏览器缓存，切季就不用再等下载。
+function schedulePrefetch(season){
+ const next=SEASON_ORDER[(SEASON_ORDER.indexOf(season)+1)%SEASON_ORDER.length];
+ prefetchModel(next);
+}
+function disposeSeasonModel(model){
+ model.traverse(o=>{
+  if(!o.isMesh)return;
+  if(o.geometry)o.geometry.dispose();
+  for(const m of (Array.isArray(o.material)?o.material:[o.material])){
+   if(!m)continue;
+   if(m.map&&m.map.dispose)m.map.dispose();
+   if(m.normalMap&&m.normalMap.dispose)m.normalMap.dispose();
+   if(m.roughnessMap&&m.roughnessMap.dispose)m.roughnessMap.dispose();
+   m.dispose();
+  }
+ });
+}
+function trimCache(keep){
+ if(cache.size<=MAX_CACHED_SEASONS)return;
+ for(const s of [...cache.keys()]){
+  if(cache.size<=MAX_CACHED_SEASONS)break;
+  if(s===keep||s===activeSeason)continue;
+  const m=cache.get(s);if(m&&m===activeModel)continue;
+  cache.delete(s);prefetched.delete(s);disposeSeasonModel(m);
+ }
+}
 function toast(message){$('#toast').textContent=message;$('#toast').classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>$('#toast').classList.remove('show'),3000);}
 async function changeSeason(season){
  if(!SEASONS[season])season='spring';const token=++loadToken;activeSeason=season;diagnostics.season=season;diagnostics.modelLoaded=false;diagnostics.frames=[];diagnostics.frameTimes=[];seasonStarted=performance.now();
@@ -130,7 +256,7 @@ async function changeSeason(season){
  $('#season-number').textContent=SEASONS[season].num;$('#season-note').textContent=SEASONS[season].note;$('#view-description').textContent='京西御田 · '+SEASONS[season].label;
  
  document.querySelectorAll('nav [data-season]').forEach(b=>{b.classList.toggle('active',b.dataset.season===season);b.setAttribute('aria-current',b.dataset.season===season?'page':'false');});
- const c=SEASONS[season];if(scene.background?.dispose)scene.background.dispose();scene.background=skyTexture(c.sky);if(farmState?.space==='town'){try{const townTex=await new THREE.TextureLoader().loadAsync('./assets/shangzhuang.jpg');townTex.colorSpace=THREE.SRGBColorSpace;scene.background=townTex;}catch{}}scene.fog=new THREE.FogExp2(c.fog,c.density);hemi.color.set(c.ambient||'#e4f1f7');hemi.intensity=ALIGN.ambientIntensity;sun.color.setHex(c.sun);sun.intensity=c.power;sun.position.fromArray(c.sunPos);setView(season);
+ const c=SEASONS[season];if(scene.background?.dispose)scene.background.dispose();scene.background=skyTexture(c.sky);scene.fog=new THREE.FogExp2(c.fog,c.density);hemi.color.set(c.ambient||'#e4f1f7');hemi.intensity=ALIGN.ambientIntensity;sun.color.setHex(c.sun);sun.intensity=c.power;sun.position.fromArray(c.sunPos);setView(season);
  scene.getObjectByName('BackdropGround').material.color.set(season==='winter'?'#c6d2cc':season==='autumn'?'#c6b07a':'#b4bf99');
  if(activeModel){scene.remove(activeModel);activeModel=null;}
  $('#asset-message').textContent='正在加载 '+c.file+'…';$('#render-mode').textContent='GLB · LOADING';
@@ -139,8 +265,12 @@ async function changeSeason(season){
   if(!model){
    const match=assets.find(a=>a.name===c.file)||assets.find(a=>a.name.toLowerCase().includes(season));
    if(!match)throw new Error('模型目录中缺少 '+c.file);
-   const gltf=await loader.loadAsync('./'+match.path.split('./').map(encodeURIComponent).join('./'));model=gltf.scene;
+   const gltf=await new Promise((resolve,reject)=>loader.load(modelURL(match),resolve,ev=>{
+     if(ev&&ev.total){const pct=Math.round(ev.loaded/ev.total*100);$('#asset-message').textContent=`正在加载 ${c.file}… ${pct}%（${(ev.loaded/1048576).toFixed(1)} / ${(ev.total/1048576).toFixed(1)} MB）`;}
+     else if(ev&&ev.loaded)$('#asset-message').textContent=`正在加载 ${c.file}… ${(ev.loaded/1048576).toFixed(1)} MB`;
+    },reject));model=gltf.scene;
    model.updateMatrixWorld(true);const basicCache=new Map();const groups=new Map();const originals=[];
+   waterMats=[];riceMats=[];tintMats=[];
    model.traverse(o=>{
     if(!o.isMesh)return;o.castShadow=!/Water|System|Rice_|Mountain/.test(o.name);o.receiveShadow=!/System|Mountain|Rice_/.test(o.name);
     if(/TreeCrowns/.test(o.name)){o.position.y-=1.4;o.scale.y=1.3;o.updateMatrixWorld(true);}
@@ -152,17 +282,24 @@ const materials=Array.isArray(o.material)?o.material:[o.material];for(const m of
     if(Array.isArray(o.material))return;
     const g=o.geometry.index?o.geometry.toNonIndexed():o.geometry.clone();g.applyMatrix4(o.matrixWorld);for(const attr of Object.keys(g.attributes))if(!['position','normal','uv'].includes(attr))g.deleteAttribute(attr);
     if(!g.attributes.normal)g.computeVertexNormals();if(!g.attributes.uv)g.setAttribute('uv',new THREE.BufferAttribute(new Float32Array(g.attributes.position.count*2),2));
-    if(/Rice_/.test(o.name))cropShader(o.material);
+    const selMats=Array.isArray(o.material)?o.material:[o.material];
+    if(/Rice_/.test(o.name)){cropShader(o.material);selMats.forEach(m=>{if(!riceMats.includes(m))riceMats.push(m);});}
+    if(/water/i.test(o.name))selMats.forEach(m=>{if(!waterMats.includes(m))waterMats.push(m);});
+    else if(/FieldEarth|Village|Ground|Field/i.test(o.name))selMats.forEach(m=>{if(!waterMats.includes(m)&&!riceMats.includes(m)&&!tintMats.includes(m))tintMats.push(m);});
     const key=o.material.uuid+':'+o.castShadow+':'+o.receiveShadow;const group=groups.get(key)||{geometries:[],material:o.material,cast:o.castShadow,receive:o.receiveShadow};group.geometries.push(g);groups.set(key,group);originals.push(o);
    });
    for(const [key,group]of groups){const geom=mergeGeometries(group.geometries,false);if(!geom)throw new Error('静态模型合批失败');const mesh=new THREE.Mesh(geom,group.material);mesh.name='StaticBatch_'+key;mesh.castShadow=group.cast;mesh.receiveShadow=group.receive;model.add(mesh);group.geometries.forEach(g=>g.dispose());}
-   originals.forEach(o=>{o.parent.remove(o);o.geometry.dispose();});cache.set(season,model);
+   originals.forEach(o=>{o.parent.remove(o);o.geometry.dispose();});cache.set(season,model);trimCache(season);
   }
   if(token!==loadToken)return;activeModel=model;scene.add(model);renderer.shadowMap.needsUpdate=true;await renderer.compileAsync(scene,camera);
+  if(farmState)syncSurface(farmState);
   if(token!==loadToken)return;diagnostics.modelLoaded=true;diagnostics.model=c.file;diagnostics.error=null;
   $('#asset-message').textContent=`${c.file} · 模型已加载 · 四季对齐 · 第 ${ALIGN.iteration-1} 轮`;
   $('#render-mode').textContent='GLB · WebGL';
+  schedulePrefetch(season);
  }catch(err){if(token!==loadToken)return;errorMessage=String(err.message);diagnostics.error=errorMessage;diagnostics.errors.push(errorMessage);$('#asset-message').textContent=errorMessage;$('#render-mode').textContent='模型待导入';}
 }
 $('#reset-view').addEventListener('click',()=>{setView(activeSeason);toast('已恢复田野镜头');});
+document.addEventListener('pointerdown',()=>{audioUnlock();if(farmState)audioScene({water:farmState.water,ecology:farmState.ecology});},{once:true});
+window.jingxiAudio={toggle:()=>{const on=audioToggle();toast(on?'音效已开启':'音效已关闭');return on;}};
 try{init();assets=(await (await fetch('./manifest.json')).json()).files;const game=mountFarm({onChange:syncFarm});mountImmersive(game);resizeView();}catch(err){$('#farm-root').textContent='页面初始化失败：'+err.message;diagnostics.errors.push(String(err));}

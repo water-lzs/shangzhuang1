@@ -2,23 +2,39 @@ const $=s=>document.querySelector(s);
 export function mountImmersive(game){
  document.body.classList.add('immersive');
  const shell=document.createElement('div');shell.id='world-shell';
- shell.innerHTML=`<div id="town-map" hidden><div id="town-art"><img src="./town-map.jpg" alt="上庄镇俯视地图"></div></div><div id="world-status"></div><div id="world-points"></div><div id="world-toolbar"><button data-world="travel">去镇上 →</button><button data-world="variety">御贡图鉴</button><button data-world="system">天工开物</button><button data-world="ending">四时终章</button><button data-world="guide">新手引导</button></div><button id="close-panel" hidden>收起面板 ×</button><div id="world-hint"></div><section id="guide-card" hidden aria-label="新手引导"><small id="guide-step"></small><h2 id="guide-title"></h2><p id="guide-copy"></p><button id="guide-do">开始</button><button id="guide-skip">稍后再看</button></section>`;
+ shell.innerHTML=`<div id="town-map" hidden><div id="town-art"><img id="town-img" src="./town-map.jpg" alt="上庄镇俯视地图"></div><div id="town-fallback" hidden>小镇地图未能加载：请确认 town-map.jpg 与 index.html 在同一目录。</div></div><div id="world-status"></div><div id="world-points"></div><div id="world-toolbar"><button data-world="travel">去镇上 →</button><button data-world="variety">御贡图鉴</button><button data-world="system">天工开物</button><button data-world="ending">四时终章</button><button data-world="guide">新手引导</button><button data-world="audio">音效</button></div><button id="close-panel" hidden>收起面板 ×</button><div id="world-hint"></div><section id="guide-card" hidden aria-label="新手引导"><small id="guide-step"></small><h2 id="guide-title"></h2><p id="guide-copy"></p><button id="guide-do">开始</button><button id="guide-skip">稍后再看</button></section>`;
  $('#app').append(shell);
+ (()=>{const img=$('#town-img');if(!img)return;const fail=()=>{const f=$('#town-fallback');if(f)f.hidden=false;};if(img.complete&&img.naturalWidth===0)fail();img.addEventListener('error',fail);})();
  const close=()=>{document.body.classList.remove('panel-open','system-open');$('#close-panel').hidden=true;};
  function open(activity){close();if(activity==='system')document.body.classList.add('system-open');else{game.setActivity(activity);document.body.classList.add('panel-open');}$('#close-panel').hidden=false;}
  function travel(space){close();game.switchSpace(space);}
  $('#close-panel').onclick=close;
  document.addEventListener('keydown',e=>{if(e.key==='Escape')close();});
  const points={home:[['十亩御田','farm',49,58],['老宅 · 系统','system',23,38]],town:[['老宅 · 回家','home',26,27],['御米作坊','processing',23,69],['集市 · 销售','sales',51,46],['酒楼 · 高端交易','restaurant',76,33],['社交驿站','social',67,76]]};
- let lastSpace;
- function sync(){const s=game.getState();document.body.dataset.space=s.space;$('#town-map').hidden=s.space!=='town';$('#world-status').textContent=`${s.space==='town'?'上庄镇 · 烟火人间':'家 · 四时御田'}　｜　第 ${s.year} 年 · ${{spring:'春',summer:'夏',autumn:'秋',winter:'冬'}[s.season]}　｜　稻米 ${s.rice} kg`;
- $('#world-hint').textContent=s.space==='town'?'拖动地图 · 滚轮缩放 · 点击建筑进入玩法':'拖动环视 · 滚轮缩放 · 点击御田开始种植';
+ function pickChannel(id){
+  // 首选走 farm-ui 暴露的 setSaleChannel：直接设渠道并刷新，不依赖「找到按钮再 click」。
+  // 按钮在品质不够（酒楼只收优等）时是 disabled 的，click 会静默失败 —— 那正是上一版
+  // 「点了酒楼还停在市场」的第二个原因。旧的重试逻辑保留为兜底。
+  if(game.setSaleChannel&&game.setSaleChannel(id))return;
+  let tries=0;
+  const go=()=>{const btn=document.querySelector(`[data-sale-channel="${id}"]`);if(btn&&!btn.disabled){btn.click();return;}if(++tries<8)requestAnimationFrame(go);};
+  go();
+ }
+ let lastSpace,lastWen;
+ function sync(){const s=game.getState();document.body.dataset.space=s.space;$('#town-map').hidden=s.space!=='town';
+ const wen=s.sales?.wen||0;
+ $('#world-status').innerHTML=`<span class="ws-line">${s.space==='town'?'上庄镇 · 烟火人间':'家 · 四时御田'}　｜　第 ${s.year} 年 · ${{spring:'春',summer:'夏',autumn:'秋',winter:'冬'}[s.season]}</span><span class="ws-line">稻米 <b>${s.rice.toLocaleString()}</b> kg　｜　体力 <b>${s.stamina}</b>　｜　种子 <b>${s.seeds}</b> 份</span><span class="ws-line ws-wallet">银钱 <b id="wallet-wen">${wen.toLocaleString()}</b> 文</span>`;
+ const wallet=$('#wallet-wen');if(wallet&&lastWen!==undefined&&lastWen!==wen){wallet.classList.add('flash');setTimeout(()=>wallet.classList.remove('flash'),900);}
+ lastWen=wen;
+ $('#world-hint').textContent=s.space==='town'?'拖动地图 · 滚轮缩放 · 点击地图上的标签进入玩法':'拖动环视 · 滚轮缩放 · 点击画面上的「十亩御田」标签进入种植';
  $('[data-world="travel"]').textContent=s.space==='town'?'← 回家':'去镇上 →';
  if(lastSpace===s.space)return;lastSpace=s.space;
  const target=s.space==='town'?$('#town-art'):$('#world-points');$('#town-art').querySelectorAll('button').forEach(b=>b.remove());$('#world-points').replaceChildren();
- for(const [name,action,x,y] of points[s.space]||points.home){const b=document.createElement('button');b.className='world-point';b.style.left=x+'%';b.style.top=y+'%';b.textContent=name;b.onclick=()=>{if(action==='home')travel('home');else{open(action==='restaurant'?'sales':action);if(action==='restaurant')document.querySelector('[data-channel="restaurant"]')?.click();}};target.append(b);}
+ for(const [name,action,x,y] of points[s.space]||points.home){const b=document.createElement('button');b.className='world-point';b.style.left=x+'%';b.style.top=y+'%';b.textContent=name;b.onclick=()=>{if(action==='home')travel('home');else{open(action==='restaurant'?'sales':action);if(action==='restaurant')pickChannel('restaurant');}};target.append(b);}
  }
- $('#world-toolbar').onclick=e=>{const a=e.target.dataset.world;if(!a)return;if(a==='travel')travel(game.getState().space==='town'?'home':'town');else if(a==='guide'){step=0;showGuide();}else open(a);};
+ $('#world-toolbar').onclick=e=>{const a=e.target.dataset.world;if(!a)return;if(a==='travel')travel(game.getState().space==='town'?'home':'town');else if(a==='guide'){step=0;showGuide();}else if(a==='audio'){const on=window.jingxiAudio?.toggle();e.target.textContent='音效 '+(on===false?'✕':'✓');toastText(on===false?'音效已关闭':'音效已开启（流水、鸟鸣、风声）');}else open(a);};
+ function toastText(t){const el=document.querySelector('#toast');if(!el)return;el.textContent=t;el.classList.add('show');clearTimeout(toastText.t);toastText.t=setTimeout(()=>el.classList.remove('show'),2600);}
+ (()=>{let off=false;try{off=localStorage.getItem('jingxi-audio-on')==='off';}catch{}const b=document.querySelector('[data-world="audio"]');if(b&&off)b.textContent='音效 ✕';})();
  const observer=new MutationObserver(sync);observer.observe($('#farm-root'),{attributes:true,attributeFilter:['data-state']});
  let scale=1,x=0,y=0,drag=null;const map=$('#town-map'),art=$('#town-art');const transform=()=>art.style.transform=`translate(${x}px,${y}px) scale(${scale})`;
  map.onwheel=e=>{e.preventDefault();scale=Math.max(1,Math.min(2.4,scale-e.deltaY*.001));const r=map.getBoundingClientRect();x=Math.max(-Math.max(0,(art.offsetWidth*scale-r.width)/2),Math.min(Math.max(0,(art.offsetWidth*scale-r.width)/2),x));y=Math.max(-Math.max(0,(art.offsetHeight*scale-r.height)/2),Math.min(Math.max(0,(art.offsetHeight*scale-r.height)/2),y));transform();};
