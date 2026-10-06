@@ -194,6 +194,8 @@ function init(){
  // 首屏布局（100dvh / 移动端地址栏收起等）落定前测量可能拿到瞬时值，再补两拍。
  requestAnimationFrame(()=>resizeView());
  setTimeout(resizeView,300);
+ // 调试钩子：?debug=1 时把场景暴露到 window，供探针 dump 场景图
+ if(new URLSearchParams(location.search).has('debug')){window.__scene=scene;window.__camera=camera;window.__renderer=renderer;window.__cropUniforms=cropUniforms;}
 }
 function skyTexture(colors){
  const c=document.createElement('canvas');c.width=1024;c.height=768;const ctx=c.getContext('2d');
@@ -282,7 +284,12 @@ async function changeSeason(season){
 o.castShadow=/Village|TreeTrunks/.test(o.name);o.receiveShadow=/FieldEarth|Village/.test(o.name);
 const materials=Array.isArray(o.material)?o.material:[o.material];for(const m of materials){m.side=THREE.DoubleSide;if(m.isMeshBasicMaterial){const tint=ALIGN.seasons[season].tint||'#ffffff';m.color.set(tint);}m.forceSinglePass=true;if(m.map)m.map.anisotropy=Math.min(4,renderer.capabilities.getMaxAnisotropy());if(/water/i.test(m.name)){m.roughness=.10;m.envMapIntensity=1.25;m.depthWrite=false;} }
     if(Array.isArray(o.material))return;
-    const g=o.geometry.index?o.geometry.toNonIndexed():o.geometry.clone();g.applyMatrix4(o.matrixWorld);for(const attr of Object.keys(g.attributes))if(!['position','normal','uv'].includes(attr))g.deleteAttribute(attr);
+    // KHR_mesh_quantization 的顶点是「归一化整数」（GPU 采样时才反归一化）。
+    // CPU 侧 applyMatrix4 读到的是原始整数值，且写回整数数组时会截断 —— 直接烘焙
+    // 会把整个农场坍缩成一个贴在原点的小黑块。先反归一化成 float32 再烘焙。
+    const g0=o.geometry.index?o.geometry.toNonIndexed():o.geometry.clone();
+    for(const an of ['position','normal','uv']){const a=g0.attributes[an];if(!a||!a.normalized)continue;const den=a.array instanceof Int8Array?127:a.array instanceof Uint8Array?255:a.array instanceof Int16Array?32767:65535;const f=new Float32Array(a.array.length);for(let i=0;i<f.length;i++){const v=a.array[i]/den;f[i]=den===127||den===32767?(v<-1?-1:v):v;}g0.setAttribute(an,new THREE.BufferAttribute(f,a.itemSize));}
+    const g=g0;g.applyMatrix4(o.matrixWorld);for(const attr of Object.keys(g.attributes))if(!['position','normal','uv'].includes(attr))g.deleteAttribute(attr);
     if(!g.attributes.normal)g.computeVertexNormals();if(!g.attributes.uv)g.setAttribute('uv',new THREE.BufferAttribute(new Float32Array(g.attributes.position.count*2),2));
     const selMats=Array.isArray(o.material)?o.material:[o.material];
     if(/Rice_/.test(o.name)){cropShader(o.material);selMats.forEach(m=>{if(!riceMats.includes(m))riceMats.push(m);});}
